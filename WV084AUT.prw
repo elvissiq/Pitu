@@ -1,29 +1,21 @@
 #INCLUDE "PROTHEUS.CH"
 
+/*/
+  @param
+  @return Não retorna nada
+  @author Totvs Nordeste (Elvis Siqueira)
+  @owner Totvs S/A
+  @version Protheus 10, Protheus 11,Protheus 12
+  @sample
+  		Este Ponto de Entrada permite que a operação de um armazém receba os produtos unitizados 
+        e realize o processo de registro de montagem do unitizador, sem que haja a necessidade 
+        de abrir o invólucro e efetuar a leitura e a digitação de quantidade de cada um dos produtos contidos no unitizador.
+  24/01/2024 - Desenvolvimento da Rotina.
+/*/
+
 User Function WV084AUT()
-Local cOrigem := PARAMIXB[1]
-Local cIdUnit := PARAMIXB[3]
-Local cSeekZZZ := ""
-Local nTamPrd := FwTamSX3("D0S_CODPRO")[1]
-Local nTamLot := FwTamSX3("D0S_LOTECT")[1]
-Local nTamSub := FwTamSX3("D0S_NUMLOT")[1]
-Local aItensUni := {}
-Local aItem := {}
-
-    cSeekZZZ := FWxFilial("ZZZ")+cOrigem+cIdUnit
-    ZZZ->(DbSetOrder(1))
-    ZZZ->(DbSeek(cSeekZZZ))
-
-    While !ZZZ->(Eof()) .And. ZZZ->ZZZ_FILIAL+ZZZ->ZZZ_ORIGEM+ZZZ->ZZZ_IDUNIT == cSeekZZZ
+    Local aUnit     := {}
     
-        AAdd(aItem,PadR(ZZZ->ZZZ_PRDORI ,nTamPrd))
-        AAdd(aItem,PadR(ZZZ->ZZZ_PRODUT ,nTamPrd))
-        AAdd(aItem,PadR(ZZZ->ZZZ_LOTECTL,nTamLot))
-        AAdd(aItem,PadR(ZZZ->ZZZ_SUBLOT ,nTamSub))
-        AAdd(aItem,ZZZ->ZZZ_QUANT)
-        AAdd(aItensUni,aItem)
-        
-    ZZZ->(DbSkip())
-    EndDo
+    MV_PAR60 := PARAMIXB[5] //ID do unitizador
 
-Return aItensUni
+Return aUnit
