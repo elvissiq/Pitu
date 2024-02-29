@@ -1,30 +1,37 @@
 #include "Totvs.ch"
+#Include 'Protheus.ch'
+#Include 'FWMVCDef.ch'
+#Include "TBICONN.CH"
+#Include "TopConn.ch"
 
 //----------------------------------------------------------------------
 /*/{PROTHEUS.DOC} A250ETRAN
-Ponto-de-Entrada: A250ETRAN - Ponto de entrada no apontamento da Produção
-@OWNER Pitu
-@VERSION PROTHEUS 12
-@SINCE 25/01/2024
-@Monta Etiqueta
-Programa Fonte
-MATA250.PRW
+	Ponto-de-Entrada: A250ETRAN - Ponto de entrada no apontamento da Produção
+	@OWNER Pitu
+	@VERSION PROTHEUS 12
+	@SINCE 07/02/2024
+	@Monta Etiqueta
+	Programa Fonte
+	MATA250.PRW
 /*/
 
 User Function A250ETRAN
 
-	Local aArea       := GetArea()
+	Local aArea       := FWGetArea()
 	Local lRet        := .T.
 	Local cProduto    := SD3->D3_COD
 	Local cArmazem    := SD3->D3_LOCAL
 	Local cLoteCTL    := SD3->D3_LOTECTL
 	Local cNumLote    := SD3->D3_NUMLOTE
-	Local cIdUnitiz	  := Alltrim(SD3->D3_XPALETE)
+	Local cIdUnitiz	  := IIF(SD3->(FieldPos("D3_XPALETE")) > 0, IIF(!Empty(Alltrim(SD3->D3_XPALETE)),Alltrim(SD3->D3_XPALETE),WmsGerUnit(.F.,.T.)), WmsGerUnit(.F.,.T.))
 	Local cOrigem     := "SC2"
-	Local cEndereco   := SuperGetMV("MV_XENDDES",.F.,"DOCAE")
-	Local cTipUni     := SuperGetMV("PC_WMSUNIT",.F.,"000001")
+	Local cEndereco   := SuperGetMV("MV_XENDPAD",.F.,"DOCAE")
+	Local cTipUni     := SuperGetMV("MV_XWMSUNI",.F.,"000001")
+	Local cEndDest    := SuperGetMV("MV_XENDDES",.F.,"PRODUCAO")
 	Local nQtde       := SD3->D3_QUANT
 	Local oMntUniItem := WMSDTCMontagemUnitizadorItens():New()
+
+	Private cDocumento := ""
 	
 	If IntWms(cProduto)
 		
@@ -89,9 +96,26 @@ User Function A250ETRAN
 
 	If !Empty(cIdUnitiz)
         ExecuteSrv(.T.,cIdUnitiz)
+		
+		If !Empty(cDocumento)
+			dbSelectArea("D12")
+			D12->(dbSetOrder(5))
+			D12->(MSSeek(xFilial()+cDocumento))
+			While !Eof() .and. xFilial()+cDocumento == D12->(D12_FILIAL+D12_DOC)
+				If D12->D12_STATUS == "4"
+					If AltD12End(D12->(Recno()), cEndDest)
+						DBGoto(Recno())
+						FinalzD12(Recno())
+					EndIF 
+					Exit
+				Endif
+				dbSkip()
+			End
+		EndIF 
+
     EndIF
 
-	RestArea(aArea)
+	FWRestArea(aArea)
 
 Return
 
@@ -123,7 +147,7 @@ Static Function ExecuteSrv(lEnd,pIdUnitiz)
 	
 	cStatus := "%"+cStatus+"%"
 	BeginSql Alias cAliasDCF
-			SELECT DCF.R_E_C_N_O_ RECNODCF
+			SELECT DCF.R_E_C_N_O_ AS RECNODCF, DCF.DCF_DOCTO AS DOCUMENTO
 			FROM %Table:DCF% DCF
 			WHERE DCF.DCF_FILIAL = %xFilial:DCF%
 			AND DCF.DCF_SERVIC BETWEEN %Exp:MV_PAR01% AND %Exp:MV_PAR02%
@@ -134,6 +158,7 @@ Static Function ExecuteSrv(lEnd,pIdUnitiz)
 	EndSql
 	// Devido processo de execução efetuar o disarmtransaction ha situações que o cache é limpo
 	// e perde-se o cAliasDCF por isso é gerado um vetor de dados para controle
+	cDocumento := (cAliasDCF)->DOCUMENTO
 	(cAliasDCF)->(dbEval({|| aAdd( aOrdSerExe,(cAliasDCF)->RECNODCF)}))
 	(cAliasDCF)->(dbCloseArea())
 	If Empty(aOrdSerExe)	
@@ -166,14 +191,13 @@ Return lEnd
 
 /*/{Protheus.doc} OSPend
 //Função que verifica se a OS ainda está pendente. 
-Na tela principal a OS está pendente e é adicionada ao array. Entretanto, durante a execução de outra OS
-esta pode ter sido aglutinada, fazendo com que o status mude e não haja mais necessidade de executá-la.
-O objetivo é evitar de fazer o LoadData da classe WMSDTCOrdemServico para essas OS's, e otimizar o
-processamento.
-@author Elvis Siqueira
-@version 1.0
-
-@type function
+	Na tela principal a OS está pendente e é adicionada ao array. Entretanto, durante a execução de outra OS
+	esta pode ter sido aglutinada, fazendo com que o status mude e não haja mais necessidade de executá-la.
+	O objetivo é evitar de fazer o LoadData da classe WMSDTCOrdemServico para essas OS's, e otimizar o
+	processamento.
+	@author Elvis Siqueira
+	@version 1.0
+	@type function
 /*/
 
 Static Function OSPend(nRecno)
@@ -195,3 +219,114 @@ Local lRet := .F.
 	(cAliasQry)->(dbCloseArea())
 
 Return lRet
+
+//-----------------------------------------------------------------------------------------------------
+Static Function AltD12End(nRecD12, cEndDes)
+
+Local aArea := GetArea()
+Local oModelEnd, oModelGrid
+Local lRet := .F.
+Local nNewRecno := 0
+Local aErro := {}
+Wm332Autom(.T.)
+WmsOpc332("6")
+WmsAcao332("1")
+oModelEnd := FWLoadModel("WMSA332A")
+oModelGrid := oModelEnd:GetModel('D12DETAIL')
+dbSelectArea("D12")
+dbGoto(nRecD12)
+oModelEnd:SetOperation(MODEL_OPERATION_UPDATE)
+oModelEnd:Activate()
+oModelGrid:SetValue('D12_ENDDES',cEndDes)
+If oModelEnd:VldData()
+	// Se os dados foram validados faz-se a gravação efetiva dos dados (commit)
+	oModelEnd:CommitData()
+	nNewRecno := D12->(recno())
+	dbGoto(nNewRecno)
+	If D12->D12_ENDDES != cEndDes
+		RecLock("D12",.F.)
+			D12->D12_ENDDES := cEndDes
+		D12->(MSUnLock())
+	EndIF
+	lRet := .T.
+Else
+	aErro := oModelEnd:GetErrorMessage()
+	// A estrutura do vetor com erro é:
+	// [1] identificador (ID) do formulário de origem
+	// [2] identificador (ID) do campo de origem
+	// [3] identificador (ID) do formulário de erro
+	// [4] identificador (ID) do campo de erro
+	// [5] identificador (ID) do erro
+	// [6] mensagem do erro
+	// [7] mensagem da solução
+	// [8] Valor atribuído
+	// [9] Valor anterior
+	lRet := .F.
+	AutoGrLog( "Id do formulário de origem:" + ' [' + AllToChar( aErro[1] ) + ']' )
+	AutoGrLog( "Id do campo de origem: " + ' [' + AllToChar( aErro[2] ) + ']' )
+	AutoGrLog( "Id do formulário de erro: " + ' [' + AllToChar( aErro[3] ) + ']' )
+	AutoGrLog( "Id do campo de erro: " + ' [' + AllToChar( aErro[4] ) + ']' )
+	AutoGrLog( "Id do erro: " + ' [' + AllToChar( aErro[5] ) + ']' )
+	AutoGrLog( "Mensagem do erro: " + ' [' + AllToChar( aErro[6] ) + ']' )
+	AutoGrLog( "Mensagem da solução: " + ' [' + AllToChar( aErro[7] ) + ']' )
+	AutoGrLog( "Valor atribuído: " + ' [' + AllToChar( aErro[8] ) + ']' )
+	AutoGrLog( "Valor anterior: " + ' [' + AllToChar( aErro[9] ) + ']' )
+	If !IsTelnet()
+		MostraErro()
+	Endif
+EndIf
+oModelEnd:DeActivate()
+RestArea(aArea)
+Return(lRet)
+//--------------------------------------------------------------------------------------------------------------
+Static Function FinalzD12(nRecno)
+
+Local lRet     := .T.
+Local aArea    := GetArea()
+Local aAreaD12 := D12->(GetArea())
+Local cAcao    := "1"
+Local cErro    := ""
+dbSelectArea("D12")
+dbGoto(nRecno)
+If D12->D12_STATUS == "4"
+	Wm332Autom(.T.)
+	WmsOpc332("4")
+	WmsAcao332(cAcao)
+	oModelEnd := FWLoadModel("WMSA332A")
+	oModelGrid := oModelEnd:GetModel('D12DETAIL')
+	dbSelectArea("D12")
+	oModelEnd:SetOperation(MODEL_OPERATION_UPDATE)
+	oModelEnd:Activate()
+	If oModelEnd:VldData()
+		// Se os dados foram validados faz-se a gravação efetiva dos dados (commit)
+		oModelEnd:CommitData()
+	Else
+		aErro := oModelEnd:GetErrorMessage()
+		// A estrutura do vetor com erro é:
+		// [1] identificador (ID) do formulário de origem
+		// [2] identificador (ID) do campo de origem
+		// [3] identificador (ID) do formulário de erro
+		// [4] identificador (ID) do campo de erro
+		// [5] identificador (ID) do erro
+		// [6] mensagem do erro
+		// [7] mensagem da solução
+		// [8] Valor atribuído
+		// [9] Valor anterior
+		AutoGrLog( "Id do formulário de origem:" + ' [' + AllToChar( aErro[1] ) + ']' )
+		AutoGrLog( "Id do campo de origem: " + ' [' + AllToChar( aErro[2] ) + ']' )
+		AutoGrLog( "Id do formulário de erro: " + ' [' + AllToChar( aErro[3] ) + ']' )
+		AutoGrLog( "Id do campo de erro: " + ' [' + AllToChar( aErro[4] ) + ']' )
+		AutoGrLog( "Id do erro: " + ' [' + AllToChar( aErro[5] ) + ']' )
+		AutoGrLog( "Mensagem do erro: " + ' [' + AllToChar( aErro[6] ) + ']' )
+		AutoGrLog( "Mensagem da solução: " + ' [' + AllToChar( aErro[7] ) + ']' )
+		AutoGrLog( "Valor atribuído: " + ' [' + AllToChar( aErro[8] ) + ']' )
+		AutoGrLog( "Valor anterior: " + ' [' + AllToChar( aErro[9] ) + ']' )
+		cErro := aErro[6]
+		lRet  := .F.
+	//	MostraErro()
+	EndIf
+	oModelEnd:DeActivate()
+Endif
+RestArea(aAreaD12)
+RestArea(aArea)
+Return(lRet)
