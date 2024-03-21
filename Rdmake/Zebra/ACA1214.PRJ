@@ -1,0 +1,65 @@
+Group 
+   Version=7.0
+   VSSDB=
+   HasProperties=1
+   Properties
+      BeforeApply=
+      AfterApply=
+      Icon=
+      ID=
+      Version=
+      PalmName=
+      OutPut=
+   End
+   ProjectsCount=1
+   Project Novo Projeto
+      FoldersCount=2
+      Folder Fontes
+         VSSPath=Fontes
+         FilesCount=13
+         File \Users\everson.ribeiro\Rdmake\Zebra\acdmgTmp.prx
+             Type=T
+         End
+         File \Users\everson.ribeiro\Rdmake\Zebra\acdimg10.prx
+             Type=T
+         End
+         File \Users\everson.ribeiro\Rdmake\Zebra\acdimg09.prx
+             Type=T
+         End
+         File \Users\everson.ribeiro\Rdmake\Zebra\acdimg08.prx
+             Type=T
+         End
+         File \Users\everson.ribeiro\Rdmake\Zebra\acdimg07.prx
+             Type=T
+         End
+         File \Users\everson.ribeiro\Rdmake\Zebra\acdimg06.prx
+             Type=T
+         End
+         File \Users\everson.ribeiro\Rdmake\Zebra\acdimg05.prx
+             Type=T
+         End
+         File \Users\everson.ribeiro\Rdmake\Zebra\acdimg04.prx
+             Type=T
+         End
+         File \Users\everson.ribeiro\Rdmake\Zebra\acdimg03.prx
+             Type=T
+         End
+         File \Users\everson.ribeiro\Rdmake\Zebra\acdimg02.prx
+             Type=T
+         End
+         File \Users\everson.ribeiro\Rdmake\Zebra\acdimg00.prx
+             Type=T
+         End
+         File \Users\everson.ribeiro\Desktop\PROTHEUS 1214\PROJETO CPARTES\MA330CP.prw
+             Type=T
+         End
+         File \Users\everson.ribeiro\Rdmake\Zebra\acdimg01.prx
+             Type=T
+         End
+      End
+      Folder Definições
+         VSSPath=Definições
+         FilesCount=0
+      End
+   End
+End

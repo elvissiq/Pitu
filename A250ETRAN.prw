@@ -23,11 +23,11 @@ User Function A250ETRAN
 	Local cArmazem    := SD3->D3_LOCAL
 	Local cLoteCTL    := SD3->D3_LOTECTL
 	Local cNumLote    := SD3->D3_NUMLOTE
-	Local cIdUnitiz	  := IIF(SD3->(FieldPos("D3_XPALETE")) > 0, IIF(!Empty(Alltrim(SD3->D3_XPALETE)),Alltrim(SD3->D3_XPALETE),WmsGerUnit(.F.,.T.)), WmsGerUnit(.F.,.T.))
-	Local cOrigem     := "SC2"
 	Local cEndereco   := SuperGetMV("MV_XENDPAD",.F.,"DOCAE")
 	Local cTipUni     := SuperGetMV("MV_XWMSUNI",.F.,"000001")
 	Local cEndDest    := SuperGetMV("MV_XENDDES",.F.,"PRODUCAO")
+	Local cIdUnitiz	  := IIF(SD3->(FieldPos("D3_XPALETE")) > 0, IIF(!Empty(Alltrim(SD3->D3_XPALETE)),WmsGerUnit(.F.,.F.,.F.,Alltrim(SD3->D3_XPALETE),cTipUni),WmsGerUnit(.F.,.T.)), WmsGerUnit(.F.,.T.))
+	Local cOrigem     := "SC2"
 	Local nQtde       := SD3->D3_QUANT
 	Local oMntUniItem := WMSDTCMontagemUnitizadorItens():New()
 
