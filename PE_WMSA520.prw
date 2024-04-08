@@ -9,7 +9,7 @@
 Ponto de entrada na rotina Troca de Produto WMS
 @OWNER WMS
 @VERSION PROTHEUS 12
-@SINCE 01/04/2024
+@SINCE 03/04/2024
 /*/
 User Function WMSA520()
 
@@ -33,7 +33,7 @@ User Function WMSA520()
 
 			xRet := {}
 			aAdd(xRet, {"Carrega Estrutura", "", {|| U_fnEstrut()}, "Carrega Estrutura"})
-			//aAdd(xRet, {"Recalcular Rateio", "", {|| U_fnRateio()}, "Recalcular Rateio"})
+			aAdd(xRet, {"Recalcular Rateio", "", {|| U_fnRateio()}, "Recalcular Rateio"})
 		
 		EndIf 
 
@@ -48,7 +48,7 @@ Return xRet
 Carrega produtos da estrutura
 @OWNER WMS
 @VERSION PROTHEUS 12
-@SINCE 01/04/2024
+@SINCE 03/04/2024
 /*/
 User Function fnEstrut()
 	Local oModel    := FwModelActive()
@@ -99,69 +99,57 @@ Return
 Calcula o rateio dos itens da estrutura
 @OWNER WMS
 @VERSION PROTHEUS 12
-@SINCE 01/04/2024
+@SINCE 03/04/2024
 /*/
 User Function fnRateio()
 	Local oModel    := FwModelActive()
 	Local oModelD0C := oModel:GetModel("A520D0C")
 	Local oView     := FWViewActive()
-	Local nQtdItens := 0
-	Local nY
-
-	/*
-	Local nPrcPai	:= 0
-	Local nPrcFilh	:= 0
 	Local cLocPad   := ""
-	Local nUPrcPai	:= 0
-	Local nUPrcFilh	:= 0
-	Local oModelD0A := oModel:GetModel("A520D0A")
-	Local aSalPai	:= {}
-	Local aSalFilho	:= {}
-	Local dDatFech	:= GetMv("MV_ULMES")
-	Local nCustPai	:= 0
-	Local nCusFilho	:= 0
-	Local nCustTotF	:= 0
-	*/
-
-	/*
-	// Custo do produto principal (Pai)
-	cLocPad := Posicione("SB1",1,xFilial("SB1")+oModelD0A:GetValue("D0A_PRODUT"),"B1_LOCPAD")
-	nUPrcPai := Posicione("SB1",1,xFilial("SB1")+oModelD0A:GetValue("D0A_PRODUT"),"B1_UPRC")
-	nCustPai := Posicione("SB1",1,xFilial("SB1")+oModelD0A:GetValue("D0A_PRODUT"),"B1_CUSTD")
-
-	aSalPai := CalcEst( oModelD0A:GetValue("D0A_PRODUT") , cLocPad , dDatFech+1 )    // Pega o saldo inicial do dia 01 do mes seguinte do produto pai
-	If( !Empty(aSalPai[2] / aSalPai[1]) , nPrcPai := aSalPai[2] / aSalPai[1] , nPrcPai := nUPrcPai )					
-	If(Empty(nPrcPai),nPrcPai:=nCustPai,.T.)
-
-	// Soma o custo dos produtos da estrutura
-	For nY := 1 To oModelD0C:Length()
-		oModelD0C:GoLine(nY)
-		IF !oModelD0C:IsDeleted()
-			cLocPad := Posicione("SB1",1,xFilial("SB1")+oModelD0C:GetValue("D0C_PRODUT"),"B1_LOCPAD")
-			nUPrcFilh := Posicione("SB1",1,xFilial("SB1")+oModelD0C:GetValue("D0C_PRODUT"),"B1_UPRC")
-			nCusFilho := Posicione("SB1",1,xFilial("SB1")+oModelD0C:GetValue("D0C_PRODUT"),"B1_CUSTD")
-						
-			aSalFilho := CalcEst( oModelD0C:GetValue("D0C_PRODUT") , cLocPad , dDatFech+1 )
-			If( !Empty(aSalFilho[2] / aSalFilho[1]) , nPrcFilh := aSalFilho[2] / aSalFilho[1] , nPrcFilh := nUPrcFilh )
-			If(Empty(nPrcFilh),nPrcFilh:=nCusFilho,.T.)
-
-			nQtdItens += oModelD0C:GetValue("QUANT")
-			nCustTotF += nCusFilho
-		EndIF
-	Next
-	*/
+	Local nCustUnit	:= 0
+	Local nCustoB1	:= 0
+	Local nCustoB2	:= 0
+	Local nCustTot  := 0
+	Local nSomaCust := 0
+	Local nY
 	
 	For nY := 1 To oModelD0C:Length()
 		oModelD0C:GoLine(nY)
 		IF !oModelD0C:IsDeleted()
-			nQtdItens += oModelD0C:GetValue("QUANT")
+			
+			cLocPad  := Posicione("SB1",1,xFilial("SB1")+oModelD0C:GetValue("D0C_PRODUT"),"B1_LOCPAD")
+			nCustoB1 := Round(Posicione("SB1",1,xFilial("SB1")+oModelD0C:GetValue("D0C_PRODUT"),"B1_CUSTD"),2)
+			nCustoB2 := Round(Posicione("SB2",1,xFilial("SB2")+oModelD0C:GetValue("D0C_PRODUT")+cLocPad,"B2_CM1"),2)
+			
+			If( !Empty(nCustoB2), nCustUnit := nCustoB2 , nCustUnit := nCustoB1 )
+			nCustTot += ( nCustUnit * oModelD0C:GetValue("QUANT") )
+
 		EndIF
 	Next
 
 	For nY := 1 To oModelD0C:Length()
 		oModelD0C:GoLine(nY)
 		IF !oModelD0C:IsDeleted()
-			oModelD0C:SetValue("D0C_RATEIO", Round( ( oModelD0C:GetValue("QUANT") / nQtdItens ), 4 ) * 100 )
+			
+			cLocPad  := Posicione("SB1",1,xFilial("SB1")+oModelD0C:GetValue("D0C_PRODUT"),"B1_LOCPAD")
+			nCustoB1 := Round(Posicione("SB1",1,xFilial("SB1")+oModelD0C:GetValue("D0C_PRODUT"),"B1_CUSTD"),2)
+			nCustoB2 := Round(Posicione("SB2",1,xFilial("SB2")+oModelD0C:GetValue("D0C_PRODUT")+cLocPad,"B2_CM1"),2)
+			
+			If( !Empty(nCustoB2), nCustUnit := nCustoB2 , nCustUnit := nCustoB1 )
+			
+			If nY < oModelD0C:Length()
+				nSomaCust += Round(( ( nCustUnit * oModelD0C:GetValue("QUANT") ) / nCustTot ) * 100,2)
+				oModelD0C:SetValue("D0C_RATEIO", ( ( nCustUnit * oModelD0C:GetValue("QUANT") ) / nCustTot ) * 100 )
+			ElseIF nY == oModelD0C:Length()
+				nSomaCust += Round(( ( nCustUnit * oModelD0C:GetValue("QUANT") ) / nCustTot ) * 100,2)
+				If nSomaCust == 100
+					oModelD0C:SetValue("D0C_RATEIO", ( ( nCustUnit * oModelD0C:GetValue("QUANT") ) / nCustTot ) * 100 )
+				ElseIF nSomaCust < 100
+					nSomaCust := 100 - nSomaCust
+					oModelD0C:SetValue("D0C_RATEIO", ( ( (nCustUnit * oModelD0C:GetValue("QUANT")) / nCustTot ) * 100) + nSomaCust )
+				EndIF 
+			EndIf 
+
 			oView:Refresh("VA520D0C")
 		EndIF
 	Next
