@@ -420,22 +420,33 @@ Static Function SldZ06(cLocal,cEndder,cProduto,cLoteCtl)
 Return(nQuant)
 
 //--------------------------------------------------------------------------------------------------------------------------
-User Function VerFinSep(cCarga, cSeq)
+User Function VerFinSep(cCarga, cSeq, cPedido)
 
 	Local aArea     := GetArea()
 	Local lFim      := .F.
 	Local cAliasZ05 := GetNextAlias()
 	
-	BeginSql Alias cAliasZ05
-		SELECT Z05_CARGA, Z05_SEQ
-		FROM %table:Z05% Z05
-		WHERE Z05.Z05_FILIAL = %xFilial:Z05%
-			AND Z05.Z05_CARGA = %Exp:cCarga%
-			AND Z05.Z05_SEQ = %Exp:cSeq%
-			AND Z05_QUANT > Z05_QUJE
-			AND Z05.%NotDel%
-	EndSql
-	
+	If ValType(cCarga) != "U"
+		BeginSql Alias cAliasZ05
+			SELECT Z05_CARGA, Z05_SEQ
+			FROM %table:Z05% Z05
+			WHERE Z05.Z05_FILIAL = %xFilial:Z05%
+				AND Z05.Z05_CARGA = %Exp:cCarga%
+				AND Z05.Z05_SEQ = %Exp:cSeq%
+				AND Z05_QUANT > Z05_QUJE
+				AND Z05.%NotDel%
+		EndSql
+	ElseIF ValType(cPedido) != "U"
+		BeginSql Alias cAliasZ05
+			SELECT Z05_CARGA, Z05_SEQ
+			FROM %table:Z05% Z05
+			WHERE Z05.Z05_FILIAL = %xFilial:Z05%
+				AND Z05.Z05_PEDIDO = %Exp:cPedido%
+				AND Z05_QUANT > Z05_QUJE
+				AND Z05.%NotDel%
+		EndSql
+	EndIF 
+
 	If (cAliasZ05)->(Eof())
 		lFim := .T.
 	Endif
