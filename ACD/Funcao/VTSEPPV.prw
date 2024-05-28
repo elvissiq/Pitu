@@ -40,16 +40,18 @@ Static Function VTPRC01()
 	Local nProxLin    := 1
 	Local cLoteCtl    := Space(FWTamSX3("B8_LOTECTL")[1])
 	Local cProduto    := Space(FWTamSX3("B1_COD")[1])
-	Local cCodBar     := Space(128)
+	Local cCodBar     := Space(250)
 	Local cLocal      := Space(FWTamSX3("B1_LOCPAD")[1])
 	Local cSeekDCI    := ''
+	//Local cSeq        := ''
 	Local nOrdemFunc  := 0
 	Local aFuncoesWMS := {}
 	Local cVolume  	  := Space(FWTamSX3("DCU_CODVOL")[1])
-	Local cMensagem   := "Gera Novo Volume ?"
-	Local lGeraVol    := .F.
+	//Local cMensagem   := "Gera Novo Volume ?"
+	//Local lGeraVol    := .F.
 	Local lFinal      := .F.
 	Local aError      := {}
+	Local nId, nY
 
 	// Pesquisa quais funcoes o usuario exerce
 	DCD->(DbSetOrder(1)) // DCD_FILIAL+DCD_CODFUN
@@ -82,7 +84,7 @@ Static Function VTPRC01()
 	While !lSair
 		
 		cPedido    := Space(FWTamSX3("C5_NUM")[1])
-		lGeraVol  := .F.
+		//lGeraVol  := .F.
 		VTCLear()
 		VTClearBuffer()
 		nProxLin := 1
@@ -104,7 +106,11 @@ Static Function VTPRC01()
 			
 			aItemPV  := BITEMPV(cPedido)
 			
-			If Len(aItemPV) > 0
+			If Empty(aItemPV)
+				Exit
+			EndIf 
+
+			For nY := 1 To Len(aItemPV)
 				nProxLin := 1
 				VtClear()
 				WMSVTCabec("Pedido: " + cPedido, .F., .F., .T.)
@@ -115,7 +121,7 @@ Static Function VTPRC01()
 				EndIf
 				
 				VtClear()
-				
+				/*
 				If WmsQuestion(cMensagem)
 					If !u_PV081Vol(@cVolume)
 						Exit
@@ -126,22 +132,21 @@ Static Function VTPRC01()
 						Exit
 					Endif
 				Endif
-				
+				*/
 				While !lSair
 					lFinal   := .F.
 					nProxLin := 1
 					cProduto := Space(FWTamSX3("B1_COD")[1])
 					cLoteCtl := Space(FWTamSX3("B8_LOTECTL")[1])
 					cLocal   := Space(FWTamSX3("B1_LOCPAD")[1])
-					cCodBar  := Space(128)
+					cCodBar  := Space(250)
 					nSaldo   := 0
+					cSeq     := aItemPV[nY,7]
 					VtClear()
 					WMSVTCabec("Informe os dados", .F., .F., .T.)
-					@ nProxLin++,00 VTSay "Volume: " + cVolume
+					//@ nProxLin++,00 VTSay "Volume: " + cVolume
 					@ nProxLin++,00 VTSay "Endereco: "
 					@ nProxLin++,00 VtGet cEndder Pict "@!"
-					@ nProxLin++,00 VTSay "Lote: "
-					@ nProxLin++,00 VtGet cLoteCtl Pict "@!"
 					@ nProxLin++,00 VTSay "Produto: "
 					@ nProxLin++,00 VtGet cCodBar Pict "@!" Valid ValPrdLot(@cProduto,@cLoteCtl,@nSaldo,@cCodBar, @cLocal, cEndder, aItemPV)
 					VTRead()
@@ -195,13 +200,14 @@ Static Function VTPRC01()
 										Z06_DATA 	with dDataBase,;
 										Z06_HORA 	with Time(),;
 										Z06_VOLUME	with cVolume,;
+										Z06_SEQ	    with cSeq,;
 										Z06_CODOPE 	with __cUserID
 								MsUnLock()
-								AtuZ05(cPedido, cProduto, cLocal)
+								AtuZ05(cPedido, cProduto, cLocal, cSeq)
 							Endif
 						
 						Endif
-						lGeraVol := .T.
+						//lGeraVol := .T.
 					
 					Endif
 					Exit
@@ -225,10 +231,10 @@ Static Function VTPRC01()
 					
 					If Empty(aError)
 						VtSay(2,0,"Finalizando Separacao, Aguarde...")
-						u_FIMEXP01(.F./*lJob*/, 1/*nOpc*/, ""/*cCarga*/, ""/*cSeq*/, cPedido, @aError)
+						u_FIMEXP01(.F./*lJob*/, 1/*nOpc*/, ""/*cCarga*/, cSeq, cPedido, @aError)
 						If Empty(aError)
 							VtSay(2,0,"Montando Volume, Aguarde...")
-							u_VOLEXP01(.F./*lJob*/, 1/*nOpc*/, /*cCarga*/, /*cSeq*/, cPedido, @aError)
+							u_VOLEXP01(.F./*lJob*/, 1/*nOpc*/, /*cCarga*/, cSeq, cPedido, @aError)
 						Endif
 					Endif
 					
@@ -242,17 +248,20 @@ Static Function VTPRC01()
 						WMSVTRodPe()
 					Else
 						WMSVTCabec("Problema Separacao", .F., .F., .T.)
-						@ 01, 00 VTSay PadR("NAO Finalizada", VTMaxCol())
-						@ 02, 00 VTSay "------------------- "
-						@ 03, 00 VTSay PadR("Ocorreram problemas", VTMaxCol())
-						@ 03, 00 VTSay PadR("Pedido.: "+cPedido, VTMaxCol())
+						
+						//Imprimir a mensagem de erro completa
+						nLinMsg := MLCount(aError[1,1],VTMaxCol())
+						For nId := 1 To nLinMsg
+							@ nId, 00 VTSay MemoLine(aError[1,1],VTMaxCol(),nId)
+						Next nId
+
+						@ nId++, 00 VTSay "------------------- "
+						@ nId++, 00 VTSay PadR("Pedido.: "+cPedido, VTMaxCol())
+						@ nId++, 00 VTSay "------------------- "
 						WMSVTRodPe()
 					Endif
 				Endif
-			
-			Else
-				Exit
-			Endif
+			Next
 		End
 	End
 Return
@@ -354,10 +363,13 @@ Static Function ValPrdLot(cProduto, cLoteCtl, nSaldo, cCodBar, cLocal, cEndder, 
 	Local nSlD14 := 0
 	Local cNumSerie := Space(FWTamSX3("D14_NUMSER")[1])
 	Local cNumLote  := Space(FWTamSX3("D14_NUMLOT")[1])
+	Local aCodBar := Strtokarr(cCodBar, "|")
 	Local nQtSep := 0
 	Local nDisp  := 0
 	
-	cProduto := Alltrim(cCodBar)
+	cProduto := aCodBar[1]
+	cLoteCtl := aCodBar[8]
+
 	nPos := aScan(aItemPV, {|x| x[1] == cProduto})
 	If nPos > 0
 		cLocal := aItemPV[nPos, 6]
@@ -375,7 +387,7 @@ Static Function ValPrdLot(cProduto, cLoteCtl, nSaldo, cCodBar, cLocal, cEndder, 
 	Endif
 	
 	If !lRet
-		cCodBar := Space(128)
+		cCodBar := Space(250)
 	Endif
 
 Return(lRet)
@@ -416,19 +428,25 @@ Static Function BITEMPV(cPedido)
 	Local cAliasZ05 := GetNextAlias()
 	
 	BeginSql Alias cAliasZ05
-		SELECT Z05_PRODUT, Z05_LOCAL, SUM(Z05_QUANT) Z05_QUANT, SUM(Z05_QUJE) Z05_QUJE
+		SELECT Z05_SEQ, Z05_PRODUT, Z05_LOCAL, SUM(Z05_QUANT) Z05_QUANT, SUM(Z05_QUJE) Z05_QUJE
 		FROM %table:Z05% Z05
 		WHERE Z05.Z05_FILIAL = %xFilial:Z05%
 			AND Z05.Z05_PEDIDO = %Exp:cPedido%
 			AND Z05.Z05_QUANT > Z05.Z05_QUJE
 			AND Z05.%NotDel%
-		GROUP BY Z05_PRODUT, Z05_LOCAL
-		ORDER BY Z05_PRODUT, Z05_LOCAL
+		GROUP BY Z05_SEQ, Z05_PRODUT, Z05_LOCAL
+		ORDER BY Z05_SEQ, Z05_PRODUT, Z05_LOCAL
 	EndSql
 	dbSelectArea(cAliasZ05)
 	
 	While !Eof()
-		aadd(aZ05Sel, {(cAliasZ05)->Z05_PRODUT, Alltrim(Posicione("SB1", 1, xFilial("SB1")+(cAliasZ05)->Z05_PRODUT, "B1_DESC")), (cAliasZ05)->(Z05_QUANT-Z05_QUJE), (cAliasZ05)->Z05_QUANT, (cAliasZ05)->Z05_QUJE, (cAliasZ05)->Z05_LOCAL})
+		aadd(aZ05Sel, {(cAliasZ05)->Z05_PRODUT,;
+						Alltrim(Posicione("SB1", 1, xFilial("SB1")+(cAliasZ05)->Z05_PRODUT, "B1_DESC")),;
+						(cAliasZ05)->(Z05_QUANT-Z05_QUJE),;
+						(cAliasZ05)->Z05_QUANT,;
+						(cAliasZ05)->Z05_QUJE,;
+						(cAliasZ05)->Z05_LOCAL,;
+						(cAliasZ05)->Z05_SEQ})
 		dbSkip()
 	End
 	(cAliasZ05)->(dbCloseArea())
@@ -457,7 +475,7 @@ Static Function VlDPedido(cPedido)
 	cWhere += "%"
 
 	BeginSql Alias cAliasDCF
-		SELECT DCF.DCF_DOCTO, DCF.DCF_CODPRO, DCF.DCF_LOCAL, DCF.DCF_QUANT, DCF.DCF_ID
+		SELECT DCF.DCF_DOCTO, DCF.DCF_CODPRO, DCF.DCF_LOCAL, DCF.DCF_QUANT, DCF.DCF_ID, DCF.DCF_SERIE
 		FROM %table:DCF% DCF
 		WHERE DCF.DCF_FILIAL = %xFilial:DCF%
 			%Exp:cWhere%
@@ -468,7 +486,7 @@ Static Function VlDPedido(cPedido)
 	While (cAliasDCF)->(!Eof())
 		
 		If !Z05->(MSSeek(xFilial("Z05")+Pad("",FWTamSX3("Z05_CARGA")[1])+Pad("",FWTamSX3("Z05_SEQCAR")[1])+;
-						 Pad((cAliasDCF)->DCF_DOCTO,FWTamSX3("Z05_PEDIDO")[1])+Pad("",FWTamSX3("Z05_SEQ")[1])+;
+						 Pad((cAliasDCF)->DCF_DOCTO,FWTamSX3("Z05_PEDIDO")[1])+Pad((cAliasDCF)->DCF_SERIE,FWTamSX3("Z05_SEQ")[1])+;
 						 Pad((cAliasDCF)->DCF_CODPRO,FWTamSX3("Z05_PRODUT")[1])+Pad((cAliasDCF)->DCF_LOCAL,FWTamSX3("Z05_LOCAL")[1]) ))
 			
 			RecLock("Z05",.T.)
@@ -477,6 +495,7 @@ Static Function VlDPedido(cPedido)
 				Z05->Z05_LOCAL  := (cAliasDCF)->DCF_LOCAL
 				Z05->Z05_QUANT  := (cAliasDCF)->DCF_QUANT
 				Z05->Z05_IDDCF  := (cAliasDCF)->DCF_ID
+				Z05->Z05_SEQ    := (cAliasDCF)->DCF_SERIE
 				Z05->Z05_PEDIDO := (cAliasDCF)->DCF_DOCTO
 			Z05->(MsUnLock())
 
@@ -532,7 +551,7 @@ Static Function VlDPedido(cPedido)
 Return(lRet)
 
 //--------------------------------------------------------------------------------------------------------------
-Static Function AtuZ05(cPedido, cProduto, cLocal)
+Static Function AtuZ05(cPedido, cProduto, cLocal, cSeq)
 
 	Local aArea     := GetArea()
 	Local cAliasZ06 := GetNextAlias()
@@ -553,7 +572,7 @@ Static Function AtuZ05(cPedido, cProduto, cLocal)
 		dbSelectArea("Z05")
 		Z05->(dbSetOrder(1))
 		Z05->(dbSeek(xFilial("Z05")+Pad("",FWTamSX3("Z05_CARGA")[1])+Pad("",FWTamSX3("Z05_SEQCAR")[1])+;
-					 Pad(cPedido,FWTamSX3("Z05_PEDIDO")[1])+Pad("",FWTamSX3("Z05_SEQ")[1])+;
+					 Pad(cPedido,FWTamSX3("Z05_PEDIDO")[1])+Pad(cSeq,FWTamSX3("Z05_SEQ")[1])+;
 					 Pad(cProduto,FWTamSX3("Z05_PRODUT")[1])+Pad(cLocal,FWTamSX3("Z05_LOCAL")[1]) ))
 
 		While !Eof() .and. xFilial()+cPedido+cProduto+cLocal == Z05->(Z05_FILIAL+Z05_PEDIDO+Z05_PRODUT+Z05_LOCAL)
@@ -562,12 +581,12 @@ Static Function AtuZ05(cPedido, cProduto, cLocal)
 			If nSaldoZ05 > 0
 				If QtdComp(nSaldoZ05) > QtdComp(nQuant)
 					RecLock("Z05", .F.)
-					Replace Z05_QUJE with nQuant
+						Replace Z05_QUJE with nQuant
 					MsUnLock()
 					Exit
 				Else
 					RecLock("Z05", .F.)
-					Replace Z05_QUJE with Z05->Z05_QUANT
+						Replace Z05_QUJE with Z05->Z05_QUANT
 					MsUnLock()
 					nQuant -= nSaldoZ05
 				Endif
@@ -654,10 +673,10 @@ User Function FIMEXP02(cEmpSep, cFilSep, lJob, nOpc, cCarga, cSeq, cPedido, cUse
 	
 	If nOpc == 1
 		cWhere += " AND D12.D12_DOC = '" + cPedido + "'"
-		//cWhere += " AND D12.D12_XSEQ = '" + cSeq + "'"
+		cWhere += " AND D12.D12_SERIE = '" + cSeq + "'"
 	Else
 		cWhere += " AND D12.D12_CARGA = '" + cCarga + "'"
-		//cWhere += " AND D12.D12_XSEQ = '" + cSeq + "'"
+		cWhere += " AND D12.D12_SERIE = '" + cSeq + "'"
 	Endif
 	
 	cWhere += "%"
@@ -730,7 +749,7 @@ Static Function SEPEXP02(cCarga, cSeqCar, cSeq, aError, cPedido)
 				FROM %table:DCF% DCF
 				WHERE DCF.DCF_FILIAL = %xFilial:DCF%
 				AND DCF_CARGA = %Exp:cCarga%
-				//AND DCF_XSEQ = %Exp:cSeq%
+				AND DCF_SERIE = %Exp:cSeq%
 				AND DCF_ORIGEM = 'SC9'
 				AND DCF_STSERV IN ('1', '2')
 				AND DCF.%NotDel%
@@ -743,6 +762,7 @@ Static Function SEPEXP02(cCarga, cSeqCar, cSeq, aError, cPedido)
 				FROM %table:DCF% DCF
 				WHERE DCF.DCF_FILIAL = %xFilial:DCF%
 				AND DCF_DOCTO = %Exp:cPedido%
+				AND DCF_SERIE = %Exp:cSeq%
 				AND DCF_ORIGEM = 'SC9'
 				AND DCF_STSERV IN ('1', '2')
 				AND DCF.%NotDel%
@@ -756,6 +776,7 @@ Static Function SEPEXP02(cCarga, cSeqCar, cSeq, aError, cPedido)
 			lContinua := .F.
 			cProduto := (cAliasDCF)->DCF_CODPRO
 			cLocal   := (cAliasDCF)->DCF_LOCAL
+			cSeq     := (cAliasDCF)->DCF_SERIE
 			nQuant   := (cAliasDCF)->DCF_QUANT
 			
 			If ValType(cCarga) != "U"
@@ -775,9 +796,10 @@ Static Function SEPEXP02(cCarga, cSeqCar, cSeq, aError, cPedido)
 					SELECT SUM(Z05_QUJE) Z05_QUJE
 					FROM %table:Z05% Z05
 					WHERE Z05.Z05_FILIAL = %xFilial:Z05%
-					AND Z05.Z05_PEDIDO = %Exp:cPedido%
 					AND Z05.Z05_PRODUT = %Exp:cProduto%
 					AND Z05.Z05_LOCAL = %Exp:cLocal%
+					AND Z05.Z05_PEDIDO = %Exp:cPedido%
+					AND Z05.Z05_SEQ = %Exp:cSeq%
 					AND Z05.%NotDel%
 				EndSql
 			EndIF
@@ -905,6 +927,12 @@ Static Function SEPEXP02(cCarga, cSeqCar, cSeq, aError, cPedido)
 			EndIf
 		Endif
 		
+		// Verifica as movimentações liberadas para verificar se há reabastecimentos gerados
+		oOrdSerExe:ChkOrdReab()
+		// O wms devera avaliar as regras para convocacao do servico e disponibilizar os
+		// registros do D12 para convocacao
+		oRegraConv:LawExecute()	
+
 		WMSDTPENDU() // Destroy as temporárias - FORA DA TRANSAÇÃO
 		oRegraConv:Destroy()
 		oOrdSerExe:Destroy()
