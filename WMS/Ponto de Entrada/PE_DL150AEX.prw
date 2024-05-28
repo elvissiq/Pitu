@@ -10,6 +10,10 @@ User Function DL150AEX()
 	Local aRecD12   := {}
 	Local nX, cIDDAG, cIDDCF
 
+	If ValType(aLibDCF) != "A"
+		Return
+	EndIF 
+	
 	For nX := 1 To Len(aLibDCF)
 		cIDDCF := aLibDCF[nX]
 		lContinua := .F.
@@ -28,6 +32,7 @@ User Function DL150AEX()
 				dbSkip()
 			End
 		Endif
+		
 		If lContinua
 
 			aRet[1] := .T.
@@ -52,14 +57,15 @@ User Function DL150AEX()
 			Endif
 		Endif
 	Next
-If Len(aRecD12) > 0
-	For nX:=1 to Len(aRecD12)
-		dbSelectArea("D12")
-		dbGoto(aRecD12[nX])
-		Processa({|| u_FinalzD12(aRecD12[nX])}, "Finalizando Serviço...","Aguarde....", .T. )
-	Next
-Endif
-RestArea(aArea)
+
+	If Len(aRecD12) > 0
+		For nX:=1 to Len(aRecD12)
+			dbSelectArea("D12")
+			dbGoto(aRecD12[nX])
+			Processa({|| u_FinalzD12(aRecD12[nX])}, "Finalizando Serviço...","Aguarde....", .T. )
+		Next
+	Endif
+	RestArea(aArea)
 Return
 
 Static Function AltD12End(nRecD12, cEndDest)
@@ -112,6 +118,7 @@ Static Function AltD12End(nRecD12, cEndDest)
 	oModelEnd:DeActivate()
 	RestArea(aArea)
 Return({lRet, nNewRecno, aErro})
+
 //--------------------------------------------------------------------------------------------------------------
 User Function FinalzD12(nRecno)
 
