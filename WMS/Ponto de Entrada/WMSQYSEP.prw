@@ -1,8 +1,10 @@
 #INCLUDE "PROTHEUS.CH"
+
 //----------------------------------------------------------------------
-/*/{PROTHEUS.DOC} WMSQYSEP
+/*/ Rotina WMSQYSEP
+
 Ponto-de-Entrada: Query utilizada na separação dos PVs
-@OWNER AgriVale
+
 @VERSION PROTHEUS 12
 @SINCE 27/06/23
 @ 
@@ -32,8 +34,9 @@ User Function WMSQYSEP()
 	Public cAGIDPal  := CriaVar("D14_IDUNIT", .F.)
 	
 	dbSelectArea("Z06")
-	If Z06->(MSSeek(xFilial("Z06")+cCarga+Pad("",FWTamSX3("Z06_SEQCAR")[1])+cDocumento))
+	If Z06->(dbSeek(FWxFilial("Z06") + cCarga + Pad("",FWTamSX3("Z06_SEQCAR")[1]) + AllTrim(cDocumento)))
 		lSepZ06 := .T.
+		
 		BeginSQL alias cAliasZ06
 			SELECT MAX(R_E_C_N_O_) RECNO
 			FROM %table:Z06%
@@ -51,7 +54,7 @@ User Function WMSQYSEP()
 		EndIF
 		(cAliasZ06)->(DBCloseArea()) 
 
-	ElseIF Z06->(MSSeek(xFilial("Z06")+cCarga)) .And. !Empty(cCarga)
+	ElseIF Z06->(dbSeek(FWxFilial("Z06")+cCarga)) .And. ! Empty(cCarga)
 		lSepZ06 := .T.
 		BeginSQL alias cAliasZ06
 			SELECT MAX(R_E_C_N_O_) RECNO
@@ -148,21 +151,38 @@ cQuery +=           " DC3_ORDEM,"
 cQuery +=           " DC3_QTDUNI,"
 cQuery +=           " D14_ENDER,"
 cQuery +=           " D14_ESTFIS,"
-cQuery +=           " D14_LOTECT,"
 cQuery +=           " D14_NUMLOT,"
 cQuery +=           " D14_DTVALD,"
 cQuery +=           " D14_NUMSER,"
 cQuery +=           " D14_PRIOR,"
-If lCnsPkgFut
-	cQuery +=       " ((D14_QTDEST+D14_QTDEPR)-(D14_QTDEMP+D14_QTDBLQ)) D14_QTDLIB,"
-	cQuery +=       " ((D14_QTDEST+D14_QTDEPR)-(D14_QTDEMP+D14_QTDBLQ+D14_QTDSPR)) D14_SALDO,"
+
+// -- Ajustado para pegar quantidade Z06
+// -------------------------------------
+If lSepZ06
+   cQuery += " Z06.Z06_LOTECT as D14_LOTECT,"
+   cQuery += " Z06.Z06_QUANT as D14_QTDLIB,"
+   cQuery += " Z06.Z06_IDUNIT as D14_IDUNIT,"
+   
+   If lCnsPkgFut
+	  cQuery += " ((D14_QTDEST+D14_QTDEPR)-(D14_QTDEMP+D14_QTDBLQ+D14_QTDSPR)) D14_SALDO,"
+    else
+	  cQuery += " (D14_QTDEST-(D14_QTDEMP+D14_QTDBLQ+D14_QTDSPR)) D14_SALDO,"
+   EndIf
 Else
-	cQuery +=       " (D14_QTDEST-(D14_QTDEMP+D14_QTDBLQ)) D14_QTDLIB,"
-	cQuery +=       " (D14_QTDEST-(D14_QTDEMP+D14_QTDBLQ+D14_QTDSPR)) D14_SALDO,"
+   cQuery += " D14.D14_LOTECT,"
+   cQuery += " D14_IDUNIT,"
+   If lCnsPkgFut
+	  cQuery +=       " ((D14_QTDEST+D14_QTDEPR)-(D14_QTDEMP+D14_QTDBLQ)) D14_QTDLIB,"
+	  cQuery +=       " ((D14_QTDEST+D14_QTDEPR)-(D14_QTDEMP+D14_QTDBLQ+D14_QTDSPR)) D14_SALDO,"
+   Else
+	  cQuery +=       " (D14_QTDEST-(D14_QTDEMP+D14_QTDBLQ)) D14_QTDLIB,"
+	  cQuery +=       " (D14_QTDEST-(D14_QTDEMP+D14_QTDBLQ+D14_QTDSPR)) D14_SALDO,"
+   EndIf
 EndIf
+// ---- ----------------------------------
+
 cQuery +=           " D14_QTDSPR,"
 cQuery +=           " D14_QTDPEM,"
-cQuery +=           " D14_IDUNIT,"
 cQuery +=           " D14_CODUNI,"
 cQuery +=           " BE_STATUS,"
 If !lCnsPkgFut
@@ -171,9 +191,9 @@ Else
 	cQuery +=       " 0 SBE_ORDCOR"
 EndIf
 If lSepZ06
-	cQuery +=  " FROM "+RetSqlName("Z06")+" Z06, " + RetSqlName("D14")+" D14"
+	cQuery +=  " FROM " + RetSqlName("Z06") + " Z06, " + RetSqlName("D14") + " D14"
 Else
-	cQuery +=  " FROM "+RetSqlName("D14")+" D14"
+	cQuery +=  " FROM " + RetSqlName("D14") + " D14"
 Endif
 // Quando separa por data de validade não segue a sequencia de abastecimento
 cQuery +=     " INNER JOIN "+RetSqlName("DC3")+" DC3"
@@ -220,18 +240,18 @@ Else
 	cQuery +=   " AND (D14.D14_QTDEST-(D14.D14_QTDEMP+D14.D14_QTDBLQ)) > 0"
 EndIf
 If lSepZ06
-	cQuery +=   " AND Z06.Z06_FILIAL = '"+xFilial("Z06")+"'"
+	cQuery +=   " AND Z06.Z06_FILIAL = '" + FWxFilial("Z06") + "'"
 	If !Empty(cCarga)
 		cQuery +=   " AND Z06.Z06_CARGA = '" + cCarga + "'"
 	ElseIF !Empty(cDocumento)
 		cQuery +=   " AND Z06.Z06_PEDIDO = '" + cDocumento + "'"
 	EndIF
 	//cQuery +=   " AND Z06.Z06_SEQ = '" + cSeq + "'"
+	cQuery +=   " AND Z06.D_E_L_E_T_ <> '*'"
 	cQuery +=   " AND Z06.Z06_PRODUT = D14.D14_PRODUT"
 	cQuery +=   " AND Z06.Z06_LOTECT = D14.D14_LOTECT"
 	cQuery +=   " AND Z06.Z06_LOCAL = D14.D14_LOCAL"
 	cQuery +=   " AND Z06.Z06_ENDER = D14.D14_ENDER"
-	cQuery +=   " AND Z06.D_E_L_E_T_ = ' '"
 Endif
 // // somente se não for regra de data de validade, senão apenas busca o produto mais antigo
 If oFuncao:oOrdServ:GetRegra() <> "4"

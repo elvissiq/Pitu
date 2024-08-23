@@ -60,8 +60,8 @@ User Function A250ETRAN
 					If oMntUniItem:MntPrdUni()
 						// Caso operador tenha saído da montagem e não tenha gerado Ordem de Serviço, altera o status para '2=Aguard. Ender'
 						
-						If oMntUniItem:oUnitiz:GetStatus() == "1" //.And. oMntUniItem:oUnitiz:UniHasItem()
-							oMntUniItem:oUnitiz:SetStatus("2") // Aguardando Endereçamento
+						If oMntUniItem:oUnitiz:GetStatus() == "1" // .And. oMntUniItem:oUnitiz:UniHasItem()
+							oMntUniItem:oUnitiz:SetStatus("2")    // Aguardando Endereçamento
 							
 							If !oMntUniItem:oUnitiz:UpdStatus()
 								lRet := .F.
@@ -89,7 +89,6 @@ User Function A250ETRAN
 	oMntUniItem:Destroy()
 
 	If !Empty(cIdUnitiz) .and. lRet
-
 		ExecuteSrv(cIdUnitiz,cEndDest)
 
 		If !Empty(cDocumento)
@@ -109,7 +108,6 @@ User Function A250ETRAN
     EndIF
 
 	FWRestArea(aArea)
-
 Return
 
 //--------------------------------------------------------------------------------------------------------------
@@ -150,37 +148,39 @@ Static Function ExecuteSrv(pIdUnitiz,cEndDest)
             AND DCF.DCF_UNITIZ = %Exp:pIdUnitiz%
 			AND DCF.%NotDel%
 	EndSql
+
 	// Devido processo de execução efetuar o disarmtransaction ha situações que o cache é limpo
 	// e perde-se o cAliasDCF por isso é gerado um vetor de dados para controle
 	cDocumento := (cAliasDCF)->DOCUMENTO
+
 	(cAliasDCF)->(dbEval({|| aAdd( aOrdSerExe,(cAliasDCF)->RECNODCF)}))
 	(cAliasDCF)->(dbCloseArea())
+
 	If Empty(aOrdSerExe)	
 		RestArea(aAreaDCF)
 		Return Nil
 	EndIf
+
 	WMSCTPENDU() // Cria as temporárias - FORA DA TRANSAÇÃO
+
 	ProcRegua(Len(aOrdSerExe))
 	oOrdSerExe:SetArrLib(oRegraConv:GetArrLib())
 	For nI := 1 To Len(aOrdSerExe)
-        
 		If OSPend(aOrdSerExe[nI]) 
 			oOrdSerExe:GoToDCF(aOrdSerExe[nI])
-			
+		
 			DCF->(DbGoTo(aOrdSerExe[nI]))
-			RecLock("DCF",.F.)
-				DCF->DCF_ENDDES := cEndDest
-			DCF->(MsUnLock())
-			
+		
 			IncProc(oOrdSerExe:GetServico()+" - "+If(Empty(oOrdSerExe:GetCarga()),Trim(oOrdSerExe:GetDocto())+"/"+Trim(oOrdSerExe:GetSerie()),Trim(oOrdSerExe:GetCarga()))+"/"+Trim(oOrdSerExe:oProdLote:GetProduto()))
 			oOrdSerExe:ExecuteDCF()
 		Else
 			IncProc('Ordem de serviço ID ' + AllTrim(aOrdSerExe[nI]) + ' já executada.')
 		EndIf
-	
 	Next 
+
 	// Verifica as movimentações liberadas para verificar se há reabastecimentos gerados
 	oOrdSerExe:ChkOrdReab()
+	
 	// O wms devera avaliar as regras para convocacao do servico e disponibilizar os
 	// registros do D12 para convocacao
 	oRegraConv:LawExecute()	
@@ -222,13 +222,14 @@ Return lRet
 
 //--------------------------------------------------------------------------------------------------------------
 Static Function FinalzD12(nRecno)
+  Local aArea    := GetArea()
+  Local aAreaD12 := D12->(GetArea())
+  Local cAcao    := "1"
+  Local cErro    := ""
+ 
+  dbSelectArea("D12")
+  D12->(dbGoto(nRecno))
 
-Local aArea    := GetArea()
-Local aAreaD12 := D12->(GetArea())
-Local cAcao    := "1"
-Local cErro    := ""
-dbSelectArea("D12")
-dbGoto(nRecno)
 If D12->D12_STATUS == "4"
 	Wm332Autom(.T.)
 	WmsOpc332("4")

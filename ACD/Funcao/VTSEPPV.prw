@@ -12,10 +12,11 @@ Rotina para realizar a separação por Pedido de Venda na Expedição
 //-------------------------------------------------------------------------------------------------------------------------------------------
 User Function VTSEPPV
 
-	Local aTela := {}
-	Local cEndCons   := PADR(SuperGetMV('MV_XENDDES',.F.," "), FWTamSX3("BE_LOCALIZ")[1]) // Endereço para realizar a separação dos PVs
+	Local aTela    := {}
+	Local cEndCons := PADR(SuperGetMV('MV_XENDDES',.F.," "), FWTamSX3("BE_LOCALIZ")[1]) // Endereço para realizar a separação dos PVs
 	
 	Private cSrvVSP  := SuperGetMv("PC_EXPSRV",.F.,"003")
+	Private cUnitiza := Space(FWTamSX3("Z06_IDUNIT")[1])
 	
 	aTela := VtSave()
 	VTClear()
@@ -42,13 +43,10 @@ Static Function VTPRC01()
 	Local cProduto    := Space(FWTamSX3("B1_COD")[1])
 	Local cCodBar     := Space(250)
 	Local cLocal      := Space(FWTamSX3("B1_LOCPAD")[1])
-	Local cSeekDCI    := ''
-	//Local cSeq        := ''
+	Local cSeekDCI    := ""
+	Local cSeq        := Space(FWTamSX3("Z05_SEQ")[1])
 	Local nOrdemFunc  := 0
 	Local aFuncoesWMS := {}
-	Local cVolume  	  := Space(FWTamSX3("DCU_CODVOL")[1])
-	//Local cMensagem   := "Gera Novo Volume ?"
-	//Local lGeraVol    := .F.
 	Local lFinal      := .F.
 	Local aError      := {}
 	Local nId, nY
@@ -83,28 +81,33 @@ Static Function VTPRC01()
 
 	While !lSair
 		
-		cPedido    := Space(FWTamSX3("C5_NUM")[1])
-		//lGeraVol  := .F.
+		cPedido := Space(FWTamSX3("C5_NUM")[1])
+
 		VTCLear()
 		VTClearBuffer()
+
 		nProxLin := 1
-		WMSVTCabec("Separacao por Pedido", .F., .F., .T.)
+
+		WMSVTCabec("Separacao Pedido", .F., .F., .T.)
 		@ nProxLin, 00 VTSay PadR("Pedido", VTMaxCol())
 		@ nProxLin, 10 VTGet cPedido Valid VlDPedido(@cPedido)
 		nProxLin++
+
 		VTRead()
 		
 		If VtLastKey() == 27
-			Exit
+		   lSair := .T.
+		   
+		   Exit
 		EndIf
 		
 		If Empty(cPedido)
-			Exit
+		   Exit
 		EndIf
 		
 		While !lSair
 			
-			aItemPV  := BITEMPV(cPedido)
+			aItemPV := BITEMPV(cPedido)
 			
 			If Empty(aItemPV)
 				Exit
@@ -112,43 +115,41 @@ Static Function VTPRC01()
 
 			For nY := 1 To Len(aItemPV)
 				nProxLin := 1
+
 				VtClear()
+
 				WMSVTCabec("Pedido: " + cPedido, .F., .F., .T.)
-				nPos := VTaBrowse(1,,,,{"Produto", "Descricao","A Separar", "Qtd. PV", "Separado", "Local"},aItemPV,{08,15,10,10,10,03},,nPos)
+
+				nPos := VTaBrowse(1,,,,{"Produto", "Descricao","A Separar", "Qtd. PV", "Separado", "Local"},aItemPV,{15,15,10,10,10,03},,nPos)
 				
 				If VTLastkey() == 27
-					Exit
+				   lSair := .T.
+
+				   Exit
 				EndIf
 				
 				VtClear()
-				/*
-				If WmsQuestion(cMensagem)
-					If !u_PV081Vol(@cVolume)
-						Exit
-					EndIf
-				Else
-					If !lGeraVol
-						WMSVTAviso("Cancelado", "Necessário geracao do Volume.")
-						Exit
-					Endif
-				Endif
-				*/
+
 				While !lSair
 					lFinal   := .F.
 					nProxLin := 1
 					cProduto := Space(FWTamSX3("B1_COD")[1])
+					cEndder  := Space(FWTamSX3("BE_LOCALIZ")[1])
 					cLoteCtl := Space(FWTamSX3("B8_LOTECTL")[1])
 					cLocal   := Space(FWTamSX3("B1_LOCPAD")[1])
+					cUnitiza := Space(FWTamSX3("Z06_IDUNIT")[1])
 					cCodBar  := Space(250)
 					nSaldo   := 0
 					cSeq     := aItemPV[nY,7]
+
 					VtClear()
+
 					WMSVTCabec("Informe os dados", .F., .F., .T.)
-					//@ nProxLin++,00 VTSay "Volume: " + cVolume
 					@ nProxLin++,00 VTSay "Endereco: "
-					@ nProxLin++,00 VtGet cEndder Pict "@!"
+					@ nProxLin++,00 VtGet cEndder Pict "@!" Valid ValEnder(@cEndder)
 					@ nProxLin++,00 VTSay "Produto: "
 					@ nProxLin++,00 VtGet cCodBar Pict "@!" Valid ValPrdLot(@cProduto,@cLoteCtl,@nSaldo,@cCodBar, @cLocal, cEndder, aItemPV)
+					
 					VTRead()
 					
 					If VTLastkey() == 27
@@ -156,31 +157,38 @@ Static Function VTPRC01()
 					EndIf
 					
 					nProxLin := 1
-					cDesc := Alltrim(Posicione("SB1", 1, xFilial("SB1")+cProduto, "B1_DESC"))
-					nQtde := 0
+					cDesc    := Alltrim(Posicione("SB1", 1, xFilial("SB1")+cProduto, "B1_DESC"))
+					nQtde    := 0
+
 					VtClear()
+
 					WMSVTCabec("Informe os dados", .F., .F., .T.)
 					@ nProxLin++,00 VTSay PadR("Produto: " + cProduto, VTMaxCol())
 					@ nProxLin++,00 VTSay PadR(cDesc, VTMaxCol())
 					@ nProxLin++,00 VTSay PadR("Lote: " + cLoteCtl, VTMaxCol())
+					@ nProxLin++,00 VTSay PadR("Unitizador: " + cUnitiza, VTMaxCol())
 					@ nProxLin++,00 VTSay PadR("A Separar: " + Alltrim(Transform(nSaldo, PesqPict("D12","D12_QTDORI"))), VTMaxCol())
 					@ nProxLin++,00 VTSay "Quantidade"
 					@ nProxLin++,00 VTGet nQtde Pict "@E 999,999.99" Valid VldQuant(cProduto, cLocal, cLoteCtl, cEndder, @nQtde, nSaldo)
+					
 					VTRead()
 					
 					If VTLastKey() != 27
 						If nQtde > 0
 							VTCLear()
 							VTClearBuffer()
+
 							nProxLin := 1
 							cConf    := "S"
-							cQtde := Alltrim(Transform(nQtde, PesqPict("D14","D14_QTDEST")))
+							cQtde    := Alltrim(Transform(nQtde, PesqPict("D14","D14_QTDEST")))
+
 							WMSVTCabec("Separacao", .F., .F., .T.)
 							@ nProxLin++,00 VTSay PadR("Produto: " + cProduto, VTMaxCol())
 							@ nProxLin++,00 VTSay PadR(cDesc, VTMaxCol())
 							@ nProxLin++,00 VTSay PadR("Lote: " + cLoteCtl, VTMaxCol())
-							@ nProxLin++,00 VtSay "Quantidade: "	 VTGet cQtde When .F.
+							@ nProxLin++,00 VtSay "Quantidade: " VTGet cQtde When .F.
 							@ nProxLin++,00 VtSay "Confirma (S/N): " VtGet cConf Pict "@!"
+
 							VTRead()
 							
 							If VtLastKey() == 27
@@ -188,39 +196,31 @@ Static Function VTPRC01()
 							EndIf
 							
 							If cConf == "S"
-								dbSelectArea("Z06")
 								RecLock("Z06", .T.)
-								Replace Z06_FILIAL 	with xFilial("Z06"),;
-										Z06_PEDIDO 	with cPedido,;
-										Z06_PRODUT 	with cProduto,;
-										Z06_LOCAL 	with cLocal,;
-										Z06_LOTECT 	with cLoteCtl,;
-										Z06_ENDER 	with cEndder,;
-										Z06_QUANT 	with nQtde,;
-										Z06_DATA 	with dDataBase,;
-										Z06_HORA 	with Time(),;
-										Z06_VOLUME	with cVolume,;
-										Z06_SEQ	    with cSeq,;
-										Z06_CODOPE 	with __cUserID
-								MsUnLock()
+								  Replace Z06_FILIAL with FWxFilial("Z06")
+								  Replace Z06_PEDIDO with cPedido
+								  Replace Z06_PRODUT with cProduto
+								  Replace Z06_LOCAL  with cLocal
+								  Replace Z06_LOTECT with cLoteCtl
+								  Replace Z06_ENDER  with cEndder
+								  Replace Z06_QUANT  with nQtde
+								  Replace Z06_DATA 	 with dDataBase
+								  Replace Z06_HORA 	 with Time()
+								  Replace Z06_SEQ	 with cSeq
+								  Replace Z06_IDUNIT with cUnitiza
+								  Replace Z06_CODOPE with __cUserID
+								Z06->(MsUnLock())
+
 								AtuZ05(cPedido, cProduto, cLocal, cSeq)
 							Endif
 						
 						Endif
-						//lGeraVol := .T.
-					
 					Endif
 					Exit
-				End
+				EndDo
 
 				VTClearBuffer()
-				
-				If !Empty(cVolume)
-					If WmsQuestion("Imprimir Etiqueta Volume?")
-						WMSV081Eti(.F., cPedido, cVolume)
-					Endif
-				Endif
-				
+
 				lFinal := u_VerFinSep(,,cPedido)
 				
 				If lFinal
@@ -232,6 +232,7 @@ Static Function VTPRC01()
 					If Empty(aError)
 						VtSay(2,0,"Finalizando Separacao, Aguarde...")
 						u_FIMEXP01(.F./*lJob*/, 1/*nOpc*/, ""/*cCarga*/, cSeq, cPedido, @aError)
+
 						If Empty(aError)
 							VtSay(2,0,"Montando Volume, Aguarde...")
 							u_VOLEXP01(.F./*lJob*/, 1/*nOpc*/, /*cCarga*/, cSeq, cPedido, @aError)
@@ -251,9 +252,10 @@ Static Function VTPRC01()
 						
 						//Imprimir a mensagem de erro completa
 						nLinMsg := MLCount(aError[1,1],VTMaxCol())
+
 						For nId := 1 To nLinMsg
 							@ nId, 00 VTSay MemoLine(aError[1,1],VTMaxCol(),nId)
-						Next nId
+						Next
 
 						@ nId++, 00 VTSay "------------------- "
 						@ nId++, 00 VTSay PadR("Pedido.: "+cPedido, VTMaxCol())
@@ -262,83 +264,20 @@ Static Function VTPRC01()
 					Endif
 				Endif
 			Next
-		End
-	End
-Return
-
-//----------------------------------------------------------
-// WMSV081Eti
-// Imprime etiqueta volume
-//----------------------------------------------------------
-Static Function WMSV081Eti(cVolume, cPedido, cCliente, cLoja)
-Local lRet      := .T.
-Local aItens    := {}
-Local cAliasZ06 := GetNextAlias()
-Local cLocImp   := Space(FWTamSX3("CB5_CODIGO")[01])
-Local cImpVol	:= SuperGetMV('PC_IMPVOL', .F., "EXP01")
-
-	// Caminho da impressão
-	If Empty(cImpVol)
-		VtClear()
-		@ 00,00 VtSay "Informe o local"
-		@ 01,00 VtSay "de Impressao:"
-		@ 02,00 VtGet cLocImp Picture "@!"
-		VtRead()
-		If VtLastkey() == 27
-			lRet := .F.
-		EndIf
-		If lRet
-			If !CB5SetImp(cLocImp,IsTelNet())
-				WMSVTAviso("WMSV08116","Local de impressao invalido!") // 
-				lRet := .F.
-			EndIf
-		EndIf
-	ElseIf !CB5SetImp(cImpVol,IsTelNet())
-		WMSVTAviso("WMSV08117","Local de impressao invalido!") // 
-		lRet := .F.
-	EndIf
-	
-	If lRet
-		BeginSql Alias cAliasZ06
-		SELECT Z06_PRODUT, Z06_LOTECT, Z06_QUANT, Z06_PEDIDO
-		FROM %table:Z06% Z06
-		WHERE Z06.Z06_FILIAL = %xFilial:Z06%
-		AND Z06_VOLUME = %Exp:cVolume%
-		AND Z06_PEDIDO = %Exp:cPedido%
-		AND Z06.%NotDel%
-		EndSql
-		If (cAliasZ06)->(!Eof())
-			Do While (cAliasZ06)->(!Eof())
-				(cAliasZ06)->(aAdd(aItens,{Z06_PRODUT,Z06_QUANT,cVolume,Z06_LOTECT," ","      ", cPedido, cCliente, cLoja}))
-				(cAliasZ06)->(dbSkip())
-			EndDo
-			WMSR410ETI(aItens,.T.,cLocImp)
-			MSCBCLOSEPRINTER()
-		Else
-			WMSVTAviso("WMSV08151","Não há etiquetas de volume pendentes de impressão! Para re-impressão utilize o monitor de volumes de expedição") // 
-		EndIf
-		(cAliasZ06)->(dbCloseArea())
-	EndIf
-	
-	If !lRet
-		VtKeyboard(Chr(20))
-	EndIf
-
+		EndDo
+	EndDo
 Return
 
 //------------------------------------------------------------------------------------------------------------------------------------------------
 Static Function VldQuant(cProduto, cLocal, cLoteCtl, cEndder, nQtde, nSaldo)
 
-	Local lRet := .T.
+	Local lRet      := .T.
 	Local cNumSerie := Space(FWTamSX3("D14_NUMSER")[1])
 	Local cNumLote  := Space(FWTamSX3("D14_NUMLOT")[1])
-	Local nSlD14 := 0
-	Local nQtSep := 0
-	Local nDisp  := 0
-	nSlD14 := WmsSldD14(cLocal,cEndder,cProduto,cNumSerie,cLoteCtl,cNumLote)
-	nQtSep := SldZ06(cLocal,cEndder,cProduto,cLoteCtl)
-	nDisp := nSlD14 - nQtSep
-	
+	Local nSlD14    := WmsSldD14(cLocal,cEndder,cProduto,cNumSerie,cLoteCtl,cNumLote)
+	Local nQtSep    := SldZ06(cLocal,cEndder,cProduto,cLoteCtl)
+	Local nDisp     := nSlD14 - nQtSep
+
 	If lRet .and. QtdComp(nQtde) > QtdComp(nSaldo)
 		WmsMessage("Quantidade Informada maior que a Quantidade a Separar","QTSMAIOR")
 		lRet := .F.
@@ -349,42 +288,82 @@ Static Function VldQuant(cProduto, cLocal, cLoteCtl, cEndder, nQtde, nSaldo)
 		lRet := .F.
 	Endif
 	
-	If !lRet
+	If ! lRet
 		nQtde := 0
 	Endif
 
 Return(lRet)
 
+//-------------------------------------------
+/*/ Função ValEnder
+
+   Função para Validar o Endereço.
+
+  @author Anderson Almeida (TOTVS NE)
+  @since  22/08/2024	
+/*/
+//-------------------------------------------
+Static Function ValEnder(cEndder)
+  Local lRet := .T.
+
+  If Empty(cEndder)
+	 WmsMessage("Endereço é obrigatório.","NENDERPV")
+
+	 lRet := .F.
+   else
+	 dbSelectArea("SBE")
+	 SBE->(dbSetOrder(1))
+
+	 If ! SBE->(dbSeek(FWxFilial("SBE") + PadR("07",FWTamSX3("BE_LOCAL")[1]) + PadR(cEndder,FWTamSX3("BE_LOCALIZ")[1])))
+	    WMSMessage("Endereço não existe.","NENDERPV")
+
+		lRet := .F.
+	 EndIf
+  EndIf
+Return lRet
+
 //--------------------------------------------------------------------------------------------------------------------------
 Static Function ValPrdLot(cProduto, cLoteCtl, nSaldo, cCodBar, cLocal, cEndder, aItemPV)
 
-	Local lRet   := .T.
-	Local nPos   := 0
-	Local nSlD14 := 0
+	Local lRet      := .T.
+	Local nPos      := 0
+	Local nSlD14    := 0
 	Local cNumSerie := Space(FWTamSX3("D14_NUMSER")[1])
 	Local cNumLote  := Space(FWTamSX3("D14_NUMLOT")[1])
-	Local aCodBar := Strtokarr(cCodBar, "|")
-	Local nQtSep := 0
-	Local nDisp  := 0
-	
-	cProduto := aCodBar[1]
-	cLoteCtl := aCodBar[8]
+	Local nQtSep    := 0
+	Local nDisp     := 0
 
-	nPos := aScan(aItemPV, {|x| x[1] == cProduto})
-	If nPos > 0
-		cLocal := aItemPV[nPos, 6]
-		nSaldo := aItemPV[nPos, 3]
-		nSlD14 := WmsSldD14(cLocal,cEndder,cProduto,cNumSerie,cLoteCtl,cNumLote)
-		nQtSep := SldZ06(cLocal,cEndder,cProduto,cLoteCtl)
-		nDisp  := nSlD14 - nQtSep
-		If nDisp <= 0
-			WmsMessage("Sem saldo para o Produto/Lote informado ","NPRODCG")
-			lRet := .F.
-		Endif
-	Else
-		WmsMessage("Produto nao encontrado na Pedido","NPRODCG")
-		lRet := .F.
-	Endif
+	aCodBar := Strtokarr(cCodBar,"|")
+	
+	If Len(aCodBar) < 2
+	   If ! Empty(aCodBar[1])
+	      WmsMessage("QrCode informado invalido. ","NPRODCG")
+       EndIf
+
+	   lRet := .F.
+	 else
+   	   cProduto := aCodBar[1]
+
+	   nPos := aScan(aItemPV, {|x| x[1] == cProduto})
+
+	   If nPos > 0
+   	      cLoteCtl := aCodBar[8]
+	  	  cLocal   := aItemPV[nPos, 6]
+		  nSaldo   := aItemPV[nPos, 3]
+		  cUnitiza := IIf(Empty(aCodBar[12]),aCodBar[12],StrZero(Val(aCodBar[12]),FWTamSX3("Z06_IDUNIT")[1]))
+		  nSlD14   := WmsSldD14(cLocal,cEndder,cProduto,cNumSerie,cLoteCtl,cNumLote)
+		  nQtSep   := SldZ06(cLocal,cEndder,cProduto,cLoteCtl)
+		  nDisp    := nSlD14 - nQtSep
+
+		  If nDisp <= 0
+		  	 WmsMessage("Sem saldo para o Produto/Lote informado ","NPRODCG")
+			 lRet := .F.
+		  Endif
+	    Else
+		  WmsMessage("Produto nao encontrado na Pedido","NPRODCG")
+		  lRet := .F.
+	   Endif
+	EndIf
 	
 	If !lRet
 		cCodBar := Space(250)
@@ -620,6 +599,43 @@ User Function SEPEXP01(cCarga, cSeqCar, cSeq, aError, cPedido)
 Return
 
 //----------------------------------------------------------------------------------------------
+User Function VerFinSep(cCarga, cSeq, cPedido)
+
+	Local aArea     := GetArea()
+	Local lFim      := .F.
+	Local cAliasZ05 := GetNextAlias()
+	
+	If ValType(cCarga) != "U"
+		BeginSql Alias cAliasZ05
+			SELECT Z05_CARGA, Z05_SEQ
+			FROM %table:Z05% Z05
+			WHERE Z05.Z05_FILIAL = %xFilial:Z05%
+				AND Z05.Z05_CARGA = %Exp:cCarga%
+				AND Z05.Z05_SEQ = %Exp:cSeq%
+				AND Z05_QUANT > Z05_QUJE
+				AND Z05.%NotDel%
+		EndSql
+	ElseIF ValType(cPedido) != "U"
+		BeginSql Alias cAliasZ05
+			SELECT Z05_CARGA, Z05_SEQ
+			FROM %table:Z05% Z05
+			WHERE Z05.Z05_FILIAL = %xFilial:Z05%
+				AND Z05.Z05_PEDIDO = %Exp:cPedido%
+				AND Z05_QUANT > Z05_QUJE
+				AND Z05.%NotDel%
+		EndSql
+	EndIF 
+
+	If (cAliasZ05)->(Eof())
+		lFim := .T.
+	Endif
+	(cAliasZ05)->(dbCloseArea())
+	
+	Restarea(aArea)
+
+Return(lFim)
+
+//----------------------------------------------------------------------------------------------
 User Function FIMEXP01(lJob, nOpc, cCarga, cSeq, cPedido, aError)
 
 	Local aArea := GetArea()
@@ -673,7 +689,6 @@ User Function FIMEXP02(cEmpSep, cFilSep, lJob, nOpc, cCarga, cSeq, cPedido, cUse
 	
 	If nOpc == 1
 		cWhere += " AND D12.D12_DOC = '" + cPedido + "'"
-		cWhere += " AND D12.D12_SERIE = '" + cSeq + "'"
 	Else
 		cWhere += " AND D12.D12_CARGA = '" + cCarga + "'"
 		cWhere += " AND D12.D12_SERIE = '" + cSeq + "'"
@@ -745,7 +760,7 @@ Static Function SEPEXP02(cCarga, cSeqCar, cSeq, aError, cPedido)
 		
 		If ValType(cCarga) != "U"
 			BeginSql Alias cAliasDCF
-				SELECT DCF_CODPRO, DCF_LOCAL, SUM(DCF_QUANT) DCF_QUANT
+				SELECT DCF_CODPRO, DCF_LOCAL, DCF_SERIE, SUM(DCF_QUANT) DCF_QUANT
 				FROM %table:DCF% DCF
 				WHERE DCF.DCF_FILIAL = %xFilial:DCF%
 				AND DCF_CARGA = %Exp:cCarga%
@@ -753,20 +768,19 @@ Static Function SEPEXP02(cCarga, cSeqCar, cSeq, aError, cPedido)
 				AND DCF_ORIGEM = 'SC9'
 				AND DCF_STSERV IN ('1', '2')
 				AND DCF.%NotDel%
-				GROUP BY DCF_CODPRO, DCF_LOCAL
+				GROUP BY DCF_CODPRO, DCF_LOCAL, DCF_SERIE
 				ORDER BY DCF_CODPRO, DCF_LOCAL
 			EndSql
 		ElseIF ValType(cPedido) != "U"
 			BeginSql Alias cAliasDCF
-				SELECT DCF_CODPRO, DCF_LOCAL, SUM(DCF_QUANT) DCF_QUANT
+				SELECT DCF_CODPRO, DCF_LOCAL, DCF_SERIE, SUM(DCF_QUANT) DCF_QUANT
 				FROM %table:DCF% DCF
 				WHERE DCF.DCF_FILIAL = %xFilial:DCF%
 				AND DCF_DOCTO = %Exp:cPedido%
-				AND DCF_SERIE = %Exp:cSeq%
 				AND DCF_ORIGEM = 'SC9'
 				AND DCF_STSERV IN ('1', '2')
 				AND DCF.%NotDel%
-				GROUP BY DCF_CODPRO, DCF_LOCAL
+				GROUP BY DCF_CODPRO, DCF_LOCAL, DCF_SERIE
 				ORDER BY DCF_CODPRO, DCF_LOCAL
 			EndSql
 		EndIF 
@@ -864,7 +878,7 @@ Static Function SEPEXP02(cCarga, cSeqCar, cSeq, aError, cPedido)
 		WMSCTPENDU() // Cria as temporárias - FORA DA TRANSAÇÃO
 		ProcRegua(Len(aOrdSerExe))
 		oOrdSerExe:SetArrLib(oRegraConv:GetArrLib())
-		
+
 		For nI := 1 To Len(aOrdSerExe)
 			oOrdSerExe:GoToDCF(aOrdSerExe[nI])
 			If (oOrdSerExe:GetStServ() $ "1|2") .And. Empty(oOrdSerExe:cStRadi)
