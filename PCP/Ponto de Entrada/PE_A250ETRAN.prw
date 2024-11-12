@@ -88,17 +88,17 @@ User Function A250ETRAN
 
 	oMntUniItem:Destroy()
 
-	If !Empty(cIdUnitiz) .and. lRet
-		ExecuteSrv(cIdUnitiz,cEndDest)
+	If ! Empty(cIdUnitiz) .and. lRet
+		U_ExecuteSrv(cIdUnitiz,cEndDest)
 
-		If !Empty(cDocumento)
+		If ! Empty(cDocumento)
 			dbSelectArea("D12")
 			D12->(dbSetOrder(5))
 			D12->(MSSeek(xFilial()+cDocumento))
 			While !Eof() .and. xFilial()+cDocumento == D12->(D12_FILIAL+D12_DOC)
 				If D12->D12_STATUS == "4"
 						DBGoto(Recno())
-						FinalzD12(Recno())
+						U_FinalzD12(Recno())
 					Exit
 				Endif
 				dbSkip()
@@ -111,7 +111,7 @@ User Function A250ETRAN
 Return
 
 //--------------------------------------------------------------------------------------------------------------
-Static Function ExecuteSrv(pIdUnitiz,cEndDest)
+User Function ExecuteSrv(pIdUnitiz,cEndDest)
     Local aAreaDCF   := DCF->(GetArea())
     Local cAliasDCF  := GetNextAlias()
     Local cStatus    := ""
@@ -221,7 +221,7 @@ Local lRet := .F.
 Return lRet
 
 //--------------------------------------------------------------------------------------------------------------
-Static Function FinalzD12(nRecno)
+Static Function U_FinalzD12(nRecno)
   Local aArea    := GetArea()
   Local aAreaD12 := D12->(GetArea())
   Local cAcao    := "1"

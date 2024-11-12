@@ -34,6 +34,7 @@ Static Function VTPRC01()
 	Local cSeq        := Space(FWTamSX3("Z05_SEQ")[1])
 	Local aItemPV     := {}
 	Local nPos        := 0
+	Local nQtde       := 0
 	Local nProxLin    := 1
 	Local cLoteCtl    := Space(FWTamSX3("B8_LOTECTL")[1])
 	Local cProduto    := Space(FWTamSX3("B1_COD")[1])
@@ -126,13 +127,14 @@ Static Function VTPRC01()
 					cLocal   := Space(FWTamSX3("B1_LOCPAD")[1])
 					cCodBar  := Space(250)
 					nSaldo   := 0
+					nQtde    := 0
 
 					VtClear()
 					WMSVTCabec("Informe o código de barras", .F., .F., .T.)
 					@ nProxLin++,00 VTSay "Endereco: "
 					@ nProxLin++,00 VtGet cEndder Pict "@!" Valid ValEnder(cEndder)
 					@ nProxLin++,00 VTSay "Produto: "
-					@ nProxLin++,00 VtGet cCodBar Pict "@!" Valid ValPrdLot(@cProduto,@cLoteCtl,@nSaldo,@cCodBar, @cLocal, cEndder, aItemPV)
+					@ nProxLin++,00 VtGet cCodBar Pict "@!" Valid ValPrdLot(@cProduto, @cLoteCtl, @nSaldo, @cCodBar, @cLocal, cEndder, aItemPV, @nQtde)
 					VTRead()
 					
 					If VTLastkey() == 27
@@ -141,7 +143,6 @@ Static Function VTPRC01()
 					
 					nProxLin := 1
 					cDesc    := AllTrim(Posicione("SB1",1,FWxFilial("SB1") + cProduto,"B1_DESC"))
-					nQtde    := 0
 					
 					VtClear()
 					
@@ -195,7 +196,7 @@ Static Function VTPRC01()
 								  Replace Z06_SEQCAR with cSeqCar
 								  Replace Z06_IDUNIT with cUnitiza
 								Z06->(MsUnLock())
-								AtuZ05(cCarga, cSeq, cProduto, cLocal)
+								AtuZ05(cCarga, cSeq, cPedido, cProduto, cLocal)
 							Endif
 						
 						Endif
@@ -339,7 +340,7 @@ Static Function VldQuant(cProduto, cLocal, cLoteCtl, cEndder, nQtde, nSaldo)
 Return(lRet)
 
 //--------------------------------------------------------------------------------------------------------------------------
-Static Function ValPrdLot(cProduto, cLoteCtl, nSaldo, cCodBar, cLocal, cEndder, aItemPV)
+Static Function ValPrdLot(cProduto, cLoteCtl, nSaldo, cCodBar, cLocal, cEndder, aItemPV, nQtde)
 
 	Local lRet      := .T.
 	Local nPos      := 0
@@ -358,6 +359,7 @@ Static Function ValPrdLot(cProduto, cLoteCtl, nSaldo, cCodBar, cLocal, cEndder, 
 	   lRet := .F.
 	 else
 	   cProduto := aCodBar[01]
+	   nQtde    := Val(aCodBar[03])
 	   nPos     := aScan(aItemPV, {|x| x[1] == cProduto})
 
    	   If nPos > 0
@@ -477,6 +479,7 @@ Static Function VlDCarga(cCarga, cSeq)
 	Local lRet      := .T.
 	Local aArea     := GetArea()
 	Local aZ05Sel   := {}
+	Local aZ05Ped   := {}
 	Local cAliasDCF := GetNextAlias()
 	Local cAliasZ05 := GetNextAlias()
 	Local nPos      := 1
@@ -500,9 +503,6 @@ Static Function VlDCarga(cCarga, cSeq)
 
     dbSelectArea("Z05")
     Z05->(dbSetOrder(1))
-
-	cSeqCar := (cAliasDCF)->DCF_SEQUEN
-	cPedido := AllTrim((cAliasDCF)->DCF_DOCTO)
 	
 	While ! (cAliasDCF)->(Eof())
 		If ! Z05->(dbSeek(FWxFilial("Z05") + cCarga +;
@@ -538,7 +538,7 @@ Static Function VlDCarga(cCarga, cSeq)
 	cWhere += "%"
 	
 	BeginSql Alias cAliasZ05
-		SELECT DISTINCT Z05_CARGA, Z05_SEQ, DAK_CAMINH, DAK_DATA
+		SELECT DISTINCT Z05_CARGA, Z05_SEQ, Z05_SEQCAR, Z05_PEDIDO, DAK_CAMINH, DAK_DATA
 		FROM %table:Z05% Z05, %table:DAK% DAK
 		WHERE Z05.Z05_FILIAL = %xFilial:Z05%
 			AND Z05.Z05_QUANT > Z05.Z05_QUJE
@@ -555,6 +555,7 @@ Static Function VlDCarga(cCarga, cSeq)
 	
 	While !(cAliasZ05)->(Eof())
 		aAdd(aZ05Sel, {(cAliasZ05)->Z05_CARGA, (cAliasZ05)->Z05_SEQ, (cAliasZ05)->DAK_CAMINH, Dtoc((cAliasZ05)->DAK_DATA)})
+		aAdd(aZ05Ped, {(cAliasZ05)->Z05_CARGA, (cAliasZ05)->Z05_SEQ, (cAliasZ05)->Z05_SEQCAR, (cAliasZ05)->Z05_PEDIDO})
 		
 		(cAliasZ05)->(dbSkip())
 	End
@@ -565,14 +566,20 @@ Static Function VlDCarga(cCarga, cSeq)
 			WMSVTCabec("Selecione Carga", .F., .F., .T.)
 			nPos := VTaBrowse(1,,,,{"Carga", "Seq", "Placa", "Dt.Emissao"},aZ05Sel,{06, 03, 08, 08},,nPos)
 			If !(VTLastkey() == 27)
-				cCarga := aZ05Sel[nPos, 1]
-				cSeq   := aZ05Sel[nPos, 2]
+				cCarga  := aZ05Sel[nPos, 1]
+				cSeq    := aZ05Sel[nPos, 2]
+
+				cSeqCar := aZ05Ped[nPos, 3]
+				cPedido := aZ05Ped[nPos, 4]
 			Else
 				lRet := .F.
 			EndIf
 		Else
-			cCarga := aZ05Sel[1, 1]
-			cSeq   := aZ05Sel[1, 2]
+			cCarga  := aZ05Sel[1, 1]
+			cSeq    := aZ05Sel[1, 2] 
+
+			cSeqCar := aZ05Ped[1, 3]
+			cPedido := aZ05Ped[1, 4]
 		Endif
 	Else
 		WmsMessage("Nao encontrada carga para separacao","NOCFSEP")
@@ -584,7 +591,7 @@ Static Function VlDCarga(cCarga, cSeq)
 Return(lRet)
 
 //--------------------------------------------------------------------------------------------------------------
-Static Function AtuZ05(cCarga, cSeq, cProduto, cLocal)
+Static Function AtuZ05(cCarga, cSeq, cPedido, cProduto, cLocal)
 
 	Local aArea     := GetArea()
 	Local cAliasZ06 := GetNextAlias()
@@ -605,14 +612,15 @@ Static Function AtuZ05(cCarga, cSeq, cProduto, cLocal)
 		nQuant := (cAliasZ06)->Z06_QUANT
 		dbSelectArea("Z05")
 		Z05->(dbSetOrder(1))
-		Z05->(dbSeek(FWxFilial("Z05") + cCarga + PadR(cSeqCar,FWTamSX3("Z05_SEQCAR")[1]) +;
-		             cPedido + cSeq + cProduto + cLocal))
-		
-		While !Eof() .and. xFilial()+cCarga+cSeq+cProduto+cLocal == Z05->(Z05_FILIAL+Z05_CARGA+Z05_SEQ+Z05_PRODUT+Z05_LOCAL)
+		Z05->(dbSeek(FWxFilial("Z05") + cCarga + PadR(cSeqCar,FWTamSX3("Z05_SEQCAR")[1]) + cPedido + cSeq + cProduto + cLocal))
+
+		While ! Z05->(Eof()) .and.;
+		   (FWxFilial("Z05") + cCarga + PadR(cSeqCar,FWTamSX3("Z05_SEQCAR")[1]) + cPedido + cSeq + cProduto + cLocal) ==;
+		    Z05->(Z05_FILIAL+Z05_CARGA+Z05_SEQCAR+Z05_PEDIDO+Z05_SEQ+Z05_PRODUT+Z05_LOCAL)
 			nSaldoZ05 := Z05->Z05_QUANT - Z05->Z05_QUJE
 			
 			If nSaldoZ05 > 0
-				If QtdComp(nSaldoZ05) > QtdComp(nQuant)
+				If QtdComp(Z05->Z05_QUANT) > QtdComp(nQuant)
 					RecLock("Z05", .F.)
 					Replace Z05_QUJE with nQuant
 					MsUnLock()
@@ -621,15 +629,12 @@ Static Function AtuZ05(cCarga, cSeq, cProduto, cLocal)
 					RecLock("Z05", .F.)
 					Replace Z05_QUJE with Z05->Z05_QUANT
 					MsUnLock()
-					nQuant -= nSaldoZ05
-				Endif
-				If nQuant <= 0
 					Exit
 				Endif
 			Endif
-			dbSelectArea("Z05")
-			dbSkip()
-		End
+
+			Z05->(dbSkip())
+		EndDo
 
 	Endif
 
